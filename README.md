@@ -48,6 +48,30 @@ trades breadth for being tiny, readable, and dependency-free.
 
 ---
 
+## How it compares to other Python options
+
+There are good existing tools here, and for several use cases they're the better
+choice — so here's an honest comparison rather than a sales pitch.
+
+| | TTL | Active expiry | Thread-safe | Eviction | Server mode | Deps | Commands |
+|---|---|---|---|---|---|---|---|
+| **`dict`** | ❌ | ❌ | ❌ | ❌ | ❌ | none | n/a |
+| **`cachetools`** | ✅ | ❌ (lazy only) | ❌ (by default) | ✅ LRU/LFU/TTL | ❌ | none | n/a |
+| **`fakeredis`** | ✅ | partial | ✅ | ✅ | ❌ (emulates) | a few | **hundreds** |
+| **redis-py + Redis** | ✅ | ✅ | ✅ (server) | ✅ | ✅ (real) | redis-py + a server | hundreds |
+| **vortis** | ✅ | ✅ (background) | ✅ (default) | ✅ (Random) | ✅ (RESP) | **none** | **5** |
+
+**Where vortis is genuinely different:** it's the only one of these that is *both*
+an in-process library *and* a RESP server from **one zero-dependency codebase**,
+with **active background expiry** and **thread-safety on by default**. That's a
+real niche — "a self-cleaning, bounded, thread-safe dict with TTL that I can also
+expose over the wire, with nothing to install." For a mature plain cache prefer
+[`cachetools`](https://pypi.org/project/cachetools/); for a test fake prefer
+[`fakeredis`](https://pypi.org/project/fakeredis/); for real Redis features or
+persistence use [redis-py](https://pypi.org/project/redis/) against a server.
+
+---
+
 ## Architecture Overview
 
 The code is layered so the same core can be used **two ways**: imported as an
