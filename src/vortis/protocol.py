@@ -6,8 +6,8 @@ The store holds all state; this module is stateless.
 """
 from dataclasses import dataclass, field
 
-from resp import encode, parse_resp
-from store import Store
+from vortis.resp import encode, parse_resp
+from vortis.store import Store
 
 
 @dataclass

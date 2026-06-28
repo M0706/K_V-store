@@ -3,7 +3,7 @@
 Named ``random_policy`` rather than ``random`` to avoid shadowing the standard
 library ``random`` module from within this package.
 """
-from eviction.base import EvictionPolicy
+from vortis.eviction.base import EvictionPolicy
 
 
 class RandomPolicy(EvictionPolicy):

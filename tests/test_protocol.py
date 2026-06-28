@@ -7,9 +7,9 @@ the store's ``data`` / ``expires`` dicts directly.
 import time
 import pytest
 
-from store import Store
-from protocol import process_input
-from resp import parse_resp, encode
+from vortis.store import Store
+from vortis.protocol import process_input
+from vortis.resp import parse_resp, encode
 
 
 # ---------------------------------------------------------------------------

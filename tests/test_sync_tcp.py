@@ -7,9 +7,9 @@ round-trip. Uses an ephemeral port to avoid clashing with the hard-coded PORT.
 import socket
 import threading
 
-import sync_tcp
-from store import Store
-from protocol import process_input
+from vortis import sync_tcp
+from vortis.store import Store
+from vortis.protocol import process_input
 
 
 def resp_array(*tokens: str) -> bytes:

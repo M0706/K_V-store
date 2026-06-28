@@ -19,8 +19,8 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install package (editable) with dev tooling
+        run: pip install -e ".[dev]"
 
       # pytest.ini carries --cov-fail-under=90, so this step fails the job
       # if any test fails OR coverage drops below 90%.

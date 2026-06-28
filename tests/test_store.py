@@ -1,13 +1,13 @@
 """Unit tests for the Store library API (Layer 1) — used directly, no RESP.
 
-This is the in-process / embeddable usage: `from store import Store`.
+This is the in-process / embeddable usage: `from vortis.store import Store`.
 """
 import threading
 import time
 
 import pytest
 
-from store import Store
+from vortis.store import Store
 
 
 @pytest.fixture

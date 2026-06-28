@@ -31,10 +31,10 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Allow running from the repo root without installing the package.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Allow running from the repo without installing the package.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from store import Store  # noqa: E402
+from vortis import Store  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

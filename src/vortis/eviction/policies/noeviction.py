@@ -1,5 +1,5 @@
 """NoEvictionPolicy — the null-object policy that never evicts."""
-from eviction.base import EvictionPolicy
+from vortis.eviction.base import EvictionPolicy
 
 
 class NoEvictionPolicy(EvictionPolicy):

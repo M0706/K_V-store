@@ -1,9 +1,9 @@
 import selectors
 import socket
 import time
-from resp import parse_resp
-from store import Store
-from protocol import RedisCmd, eval_and_respond
+from vortis.resp import parse_resp
+from vortis.store import Store
+from vortis.protocol import RedisCmd, eval_and_respond
 
 HOST = "127.0.0.1"
 PORT = 65432

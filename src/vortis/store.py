@@ -29,8 +29,8 @@ import threading
 import time
 from contextlib import nullcontext
 
-from eviction import EVICTION_SAMPLES, KeyCountSizer, make_policy
-from sweeper import BackgroundSweeper
+from vortis.eviction import EVICTION_SAMPLES, KeyCountSizer, make_policy
+from vortis.sweeper import BackgroundSweeper
 
 # Active-expire tuning (mirrors Redis's activeExpireCycle constants), used by
 # active_expire_cycle below.

@@ -2,7 +2,7 @@
 import threading
 import time
 
-from sweeper import BackgroundSweeper
+from vortis.sweeper import BackgroundSweeper
 
 
 def test_runs_task_periodically():

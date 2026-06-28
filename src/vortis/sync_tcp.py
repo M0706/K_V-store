@@ -1,6 +1,6 @@
 import socket
-from store import Store
-from protocol import process_input
+from vortis.store import Store
+from vortis.protocol import process_input
 
 HOST = "127.0.0.1"
 PORT = 65432

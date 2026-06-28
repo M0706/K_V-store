@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+# packaging build artifacts
+*.egg-info/
+build/
+dist/

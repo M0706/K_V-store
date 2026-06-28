@@ -20,9 +20,10 @@ import time
 import tracemalloc
 from concurrent.futures import ThreadPoolExecutor
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Allow running from the repo without installing the package.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from store import Store  # noqa: E402
+from vortis import Store  # noqa: E402
 
 
 def _fmt(n: float) -> str:

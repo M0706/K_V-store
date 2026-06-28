@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vortis"
+version = "0.1.0"
+description = "A fast in-memory key-value store with TTL, active expiry, and eviction — usable as a library or a RESP server."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Manav Garg" }]
+keywords = ["key-value", "in-memory", "cache", "ttl", "redis", "resp", "eviction"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Database",
+    "Intended Audience :: Developers",
+]
+# No runtime dependencies — pure standard library.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "pytest-cov==7.1.0", "coverage==7.14.3"]
+
+[project.scripts]
+vortis = "vortis.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.coverage.run]
+# __main__.py is a pure process entrypoint (python -m vortis); it is never
+# imported by tests, so exclude it rather than chase a contrived test.
+omit = ["*/vortis/__main__.py"]

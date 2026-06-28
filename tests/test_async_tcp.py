@@ -7,7 +7,7 @@ and deterministic. We deliberately do NOT test run()'s infinite event loop here
 """
 import pytest
 
-from async_tcp import AsyncTCPServer
+from vortis.async_tcp import AsyncTCPServer
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ class TestReadFraming:
 
 class TestServerEviction:
     def _bounded_server(self, max_size):
-        from store import Store
+        from vortis.store import Store
         srv = AsyncTCPServer(store=Store(thread_safe=False, max_size=max_size,
                                          eviction="random"))
 

@@ -7,14 +7,14 @@ import threading
 
 import pytest
 
-from eviction import (
+from vortis.eviction import (
     EVICTION_SAMPLES,
     KeyCountSizer,
     NoEvictionPolicy,
     RandomPolicy,
     make_policy,
 )
-from store import Store
+from vortis.store import Store
 
 
 # ---------------------------------------------------------------------------

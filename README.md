@@ -1,6 +1,10 @@
-# K/V Store
+# vortis
 
-A Redis-compatible in-memory key-value store written in Python from scratch. It speaks the [RESP protocol](https://redis.io/docs/reference/protocol-spec/) (Redis Serialization Protocol), which means any standard Redis client — `redis-cli`, `redis-py`, `redis-benchmark`, etc. — can connect to it without modification.
+A fast in-memory key-value store with TTL, active expiry, and eviction — usable
+**as a library** (`from vortis import Store`) or **as a server**. The server
+speaks the [RESP protocol](https://redis.io/docs/reference/protocol-spec/), so
+any standard Redis client — `redis-cli`, `redis-py`, `redis-benchmark` — can
+connect without modification.
 
 ---
 
@@ -10,11 +14,14 @@ The code is layered so the same core can be used **two ways**: imported as an
 in-process library, or run as a network server. Each layer depends only on the
 one below it.
 
+The package lives under `src/vortis/`. Each layer depends only on the one below
+it.
+
 ```
-Layer 3  async_tcp.py / sync_tcp.py  — TCP servers (RESP over sockets)
-Layer 2  protocol.py                 — RESP <-> Store command translation
-Layer 1  store.py                    — Store: the pure in-memory KV core
-         resp.py                     — RESP parser/encoder (used by Layer 2)
+Layer 3  vortis/async_tcp.py, sync_tcp.py  — TCP servers (RESP over sockets)
+Layer 2  vortis/protocol.py                — RESP <-> Store command translation
+Layer 1  vortis/store.py                   — Store: the pure in-memory KV core
+         vortis/resp.py                    — RESP parser/encoder (used by Layer 2)
 ```
 
 - **`store.py` (`Store`)** — the actual key-value engine: the keyspace, TTL, and
@@ -53,7 +60,7 @@ Layer 1  store.py                    — Store: the pure in-memory KV core
 no protocol, no separate process:
 
 ```python
-from store import Store
+from vortis import Store
 
 s = Store()
 s.set("session", "abc123", ex=60)   # TTL in seconds (px=... for milliseconds)
@@ -67,7 +74,7 @@ wants a dict with Redis-style TTL semantics and nothing to install or run.
 **As a server (over the network).** Run it and point any Redis client at it:
 
 ```python
-from async_tcp import serve
+from vortis import serve
 serve(port=6379)
 ```
 
@@ -149,7 +156,7 @@ sweeper that proactively reclaims expired keys on its own — no event loop, no
 cron, no work from you:
 
 ```python
-from store import Store
+from vortis import Store
 
 with Store(active_expiry=True) as s:
     s.set("temp", "x", ex=5)
@@ -221,7 +228,7 @@ To put a hard ceiling on the store, pass `max_size`. Once full, each new write
 first **evicts** an existing key to make room (Redis's evict-then-write):
 
 ```python
-from store import Store
+from vortis import Store
 
 s = Store(max_size=10_000, eviction="random")
 # the store never holds more than 10,000 keys; the 10,001st write evicts one first
@@ -313,19 +320,31 @@ python scripts/benchmark.py
 ## Requirements
 
 - Python 3.10+ (uses `X | Y` union type hints)
-- No external dependencies for the server itself
+- No runtime dependencies — pure standard library
 
-For tests:
-```
-pip install pytest
+## Installation
+
+```bash
+pip install -e .          # the library + the `vortis` CLI
+pip install -e ".[dev]"   # also pytest/coverage for running the tests
 ```
 
 ---
 
 ## Running the Server
 
+After installing, launch the server any of these ways:
+
 ```bash
-python main.py
+vortis                 # the installed console command
+python -m vortis       # or as a module
+```
+
+Or from Python:
+
+```python
+from vortis import serve
+serve(port=6379)
 ```
 
 The server listens on `127.0.0.1:65432` by default.
@@ -334,15 +353,8 @@ The server listens on `127.0.0.1:65432` by default.
 Listening on 127.0.0.1:65432
 ```
 
-To switch to the synchronous single-client server (useful for debugging), edit `main.py`:
-
-```python
-# Change this:
-AsyncTCPServer().run()
-
-# To this:
-run_sync_tcp_server()
-```
+The synchronous single-client server (`vortis.sync_tcp.run_sync_tcp_server`)
+remains available as a simpler reference implementation for debugging.
 
 ---
 
@@ -516,48 +528,53 @@ Every PR into `staging` and `master` must satisfy:
 
 ```
 .
-├── main.py                  # Entry point — starts the async server
-├── store.py                 # Store: in-memory KV core (TTL, expiry, thread-safety, bounding)
-├── protocol.py              # RESP <-> Store command translation (stateless)
-├── async_tcp.py             # Non-blocking selector-based TCP server
-├── sync_tcp.py              # Blocking single-client TCP server (reference)
-├── resp.py                  # RESP protocol parser and encoder
-├── sweeper.py               # BackgroundSweeper: runs a task periodically on a daemon thread
-├── eviction/                # Eviction strategies (Strategy pattern)
-│   ├── base.py              #   EvictionPolicy ABC + EVICTION_SAMPLES
-│   ├── sizer.py             #   Sizer ABC + KeyCountSizer
-│   └── policies/            #   one policy per module
-│       ├── noeviction.py    #     NoEvictionPolicy (null object)
-│       └── random_policy.py #     RandomPolicy
+├── pyproject.toml           # Packaging + the `vortis` console script
+├── src/vortis/              # The importable package
+│   ├── __init__.py          #   public API: Store, serve, AsyncTCPServer
+│   ├── __main__.py          #   `python -m vortis` entry point
+│   ├── store.py             #   Store: in-memory KV core (TTL, expiry, thread-safety, bounding)
+│   ├── protocol.py          #   RESP <-> Store command translation (stateless)
+│   ├── async_tcp.py         #   Non-blocking selector-based TCP server
+│   ├── sync_tcp.py          #   Blocking single-client TCP server (reference)
+│   ├── resp.py              #   RESP protocol parser and encoder
+│   ├── sweeper.py           #   BackgroundSweeper: runs a task periodically on a daemon thread
+│   └── eviction/            #   Eviction strategies (Strategy pattern)
+│       ├── base.py          #     EvictionPolicy ABC + EVICTION_SAMPLES
+│       ├── sizer.py         #     Sizer ABC + KeyCountSizer
+│       └── policies/        #     one policy per module
+│           ├── noeviction.py #      NoEvictionPolicy (null object)
+│           └── random_policy.py  # RandomPolicy
+├── scripts/                 # benchmark.py, stress_test.py
 └── tests/                   # pytest test suite
-    ├── test_store.py        # Store library API + thread-safety + background expiry
-    ├── test_sweeper.py      # BackgroundSweeper lifecycle + resilience
-    ├── test_protocol.py     # RESP command layer over a Store
-    ├── test_eviction.py     # Sizer/policies + bounded-Store integration
-    ├── test_async_tcp.py    # Server framing logic
-    └── test_sync_tcp.py     # Legacy server integration smoke test
+    ├── test_store.py        #   Store library API + thread-safety + background expiry
+    ├── test_sweeper.py      #   BackgroundSweeper lifecycle + resilience
+    ├── test_protocol.py     #   RESP command layer over a Store
+    ├── test_eviction.py     #   Sizer/policies + bounded-Store integration
+    ├── test_async_tcp.py    #   Server framing logic
+    └── test_sync_tcp.py     #   sync server integration smoke test
 ```
 
 ---
 
 ## Configuration
 
-The host and port are hardcoded at the top of `async_tcp.py` and `sync_tcp.py`:
+The host and port default in `src/vortis/async_tcp.py` and `src/vortis/sync_tcp.py`
+(or pass `host`/`port` to `serve()`):
 
 ```python
 HOST = "127.0.0.1"
 PORT = 65432
 ```
 
-Change these directly if you need the server to bind on a different interface or port (e.g. `HOST = "0.0.0.0"` to accept connections from other machines).
+Use `serve(host="0.0.0.0", port=6379)` to accept connections from other machines.
 
-The active expiry interval is controlled in `async_tcp.py`:
+The active expiry interval is controlled in `src/vortis/async_tcp.py`:
 
 ```python
 CRON_INTERVAL = 0.1  # seconds — how often the active-expire cycle runs
 ```
 
-And the sampling parameters in `store.py`:
+And the sampling parameters in `src/vortis/store.py`:
 
 ```python
 KEYS_PER_LOOP = 20       # keys sampled per cycle

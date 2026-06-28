@@ -17,9 +17,9 @@ Layout (one policy per module):
 This package's public API is the ABCs, the shipped concrete strategies, and the
 ``make_policy`` factory.
 """
-from eviction.base import EVICTION_SAMPLES, EvictionPolicy
-from eviction.policies import NoEvictionPolicy, RandomPolicy
-from eviction.sizer import KeyCountSizer, Sizer
+from vortis.eviction.base import EVICTION_SAMPLES, EvictionPolicy
+from vortis.eviction.policies import NoEvictionPolicy, RandomPolicy
+from vortis.eviction.sizer import KeyCountSizer, Sizer
 
 __all__ = [
     "EVICTION_SAMPLES",
