@@ -7,10 +7,9 @@ round-trip. Uses an ephemeral port to avoid clashing with the hard-coded PORT.
 import socket
 import threading
 
-import pytest
-
 import sync_tcp
-import sync_commands
+from store import Store
+from protocol import process_input
 
 
 def resp_array(*tokens: str) -> bytes:
@@ -20,16 +19,7 @@ def resp_array(*tokens: str) -> bytes:
     return b"".join(parts)
 
 
-@pytest.fixture(autouse=True)
-def clear_store():
-    sync_commands.store.clear()
-    sync_commands.expires.clear()
-    yield
-    sync_commands.store.clear()
-    sync_commands.expires.clear()
-
-
-def _serve_one(server_sock):
+def _serve_one(server_sock, store):
     """Accept a single connection and echo RESP responses until it closes.
 
     A trimmed copy of run_sync_tcp_server()'s per-connection loop that exits
@@ -41,17 +31,18 @@ def _serve_one(server_sock):
             data = conn.recv(4096)
             if not data:
                 break
-            conn.sendall(sync_commands.process_input(data))
+            conn.sendall(process_input(store, data))
 
 
 def test_set_get_roundtrip_over_real_socket():
+    store = Store()
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_sock.bind(("127.0.0.1", 0))  # ephemeral port
     server_sock.listen()
     port = server_sock.getsockname()[1]
 
-    t = threading.Thread(target=_serve_one, args=(server_sock,), daemon=True)
+    t = threading.Thread(target=_serve_one, args=(server_sock, store), daemon=True)
     t.start()
 
     try:
@@ -65,7 +56,7 @@ def test_set_get_roundtrip_over_real_socket():
         server_sock.close()
 
     # State went through the real process_input path.
-    assert sync_commands.store["k"][0] == "v"
+    assert store.data["k"][0] == "v"
 
 
 def test_run_sync_tcp_server_is_importable():

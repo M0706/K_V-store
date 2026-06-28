@@ -7,7 +7,6 @@ and deterministic. We deliberately do NOT test run()'s infinite event loop here
 """
 import pytest
 
-import sync_commands
 from async_tcp import AsyncTCPServer
 
 
@@ -42,15 +41,6 @@ class FakeSock:
 
     def close(self) -> None:
         self.closed = True
-
-
-@pytest.fixture(autouse=True)
-def clear_store():
-    sync_commands.store.clear()
-    sync_commands.expires.clear()
-    yield
-    sync_commands.store.clear()
-    sync_commands.expires.clear()
 
 
 @pytest.fixture
@@ -137,7 +127,7 @@ class TestReadFraming:
         for _ in range(3):
             server._read(sock)
         assert sock.sent == b"+OK\r\n"
-        assert sync_commands.store["k"][0] == "v"
+        assert server.store.data["k"][0] == "v"
 
     def test_disconnect_closes_connection(self, server):
         sock = FakeSock([])  # recv() returns b"" immediately = client FIN

@@ -2,7 +2,8 @@ import selectors
 import socket
 import time
 from resp import parse_resp
-from sync_commands import RedisCmd, active_expire_cycle, eval_and_respond
+from store import Store
+from protocol import RedisCmd, eval_and_respond
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -13,7 +14,13 @@ CRON_INTERVAL = 0.1
 
 
 class AsyncTCPServer:
-    def __init__(self) -> None:
+    def __init__(self, store: Store | None = None) -> None:
+        # The keyspace this server serves. A fresh one is created if not given,
+        # so callers can share or inspect the store if they want to.
+        # The server is single-threaded (one event loop), so it opts out of the
+        # store's default lock for a contention-free hot path. It drives active
+        # expiry itself from the loop, so it doesn't need the background daemon.
+        self.store = store if store is not None else Store(thread_safe=False)
         # kqueue (macOS) or epoll (Linux) instance
         self.sel = selectors.DefaultSelector()
         # Per-connection read buffer — TCP is a byte stream, not a message stream
@@ -54,7 +61,7 @@ class AsyncTCPServer:
             consumed = self._resp_byte_length(self.read_buffers[conn], len(tokens))
             self.read_buffers[conn] = self.read_buffers[conn][consumed:]
 
-            response = eval_and_respond(RedisCmd(cmd=tokens[0].upper(), args=tokens[1:]))
+            response = eval_and_respond(self.store, RedisCmd(cmd=tokens[0].upper(), args=tokens[1:]))
             try:
                 conn.sendall(response)
             except (BrokenPipeError, ConnectionResetError):
@@ -74,13 +81,13 @@ class AsyncTCPServer:
             # Inline command: everything up to and including the first \r\n
             return data.index(b"\r\n") + 2
 
-    def run(self) -> None:  # pragma: no cover - event loop / real socket IO
+    def run(self, host: str = HOST, port: int = PORT) -> None:  # pragma: no cover - event loop / real socket IO
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind((HOST, PORT))
+        server.bind((host, port))
         server.listen()
         server.setblocking(False)
-        print(f"Listening on {HOST}:{PORT}")
+        print(f"Listening on {host}:{port}")
 
         # Register server socket — readable means a new connection is waiting
         self.sel.register(server, selectors.EVENT_READ, data=self._accept)
@@ -105,7 +112,19 @@ class AsyncTCPServer:
             # thread between socket events, so no locks are needed on the store.
             now = time.monotonic()
             if now - last_cron >= CRON_INTERVAL:
-                active_expire_cycle(time_budget_ms=1.0)
+                self.store.active_expire_cycle(time_budget_ms=1.0)
                 last_cron = now
+
+
+def serve(host: str = HOST, port: int = PORT, store: Store | None = None) -> None:  # pragma: no cover - real socket IO
+    """Run the key-value store as a RESP server (blocks forever).
+
+    Convenience entry point so the package can be used as a server with one
+    call::
+
+        from async_tcp import serve
+        serve(port=6379)
+    """
+    AsyncTCPServer(store=store).run(host=host, port=port)
 
 
