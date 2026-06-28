@@ -137,19 +137,78 @@ This is the same reason Redis provides `MULTI`/`EXEC` despite being
 single-threaded. Multi-command atomicity requires an explicit boundary; per-
 command atomicity is automatic.
 
-### Background expiry (optional)
+### Self-cleaning store: background active expiry
 
-In server mode the event loop drives `active_expire_cycle()` itself. In library
-mode there is no loop, so a key that is *never read again* would not be actively
-reclaimed (passive expiry still frees it on the next access). To reclaim
-untouched keys automatically, enable the background sweeper, which runs on its
-own daemon thread (and therefore forces the lock on):
+A normal in-memory cache only frees an expired key when you *touch* it again
+(passive expiry). That means a key you set with a TTL and then **never read
+again** sits in memory until you happen to access it — a slow leak for
+write-heavy or fire-and-forget workloads.
+
+`Store` can clean itself. Pass `active_expiry=True` and it runs a background
+sweeper that proactively reclaims expired keys on its own — no event loop, no
+cron, no work from you:
 
 ```python
-with Store(active_expiry=True) as s:   # daemon thread stopped on exit
+from store import Store
+
+with Store(active_expiry=True) as s:
     s.set("temp", "x", ex=5)
-    ...
+    # ... 5 seconds later, even if nobody ever reads "temp" again,
+    # the background sweeper has already removed it. No leak.
 ```
+
+The `with` block is the recommended form: the sweeper thread is started on entry
+and **stopped automatically on exit**, so you never leak a thread.
+
+#### Without a context manager
+
+If a `with` block doesn't fit your code (e.g. the store lives for the whole
+process), start and stop the sweeper explicitly:
+
+```python
+s = Store(active_expiry=True)   # or: s = Store(); s.start_expiry()
+# ... use s for the lifetime of your app ...
+s.stop()                         # stop the sweeper when shutting down
+```
+
+Both `start_expiry()` and `stop()` are idempotent and safe to call more than
+once. The thread is a **daemon**, so even if you forget to stop it, it won't
+block your process from exiting.
+
+#### Tuning the sweeper
+
+Two knobs control the cost/freshness trade-off:
+
+```python
+Store(
+    active_expiry=True,
+    expiry_interval=0.1,    # seconds between sweeps (default 0.1 = 10x/sec, like Redis)
+    expiry_budget_ms=1.0,   # max time one sweep may run before yielding (default 1ms)
+)
+```
+
+- **`expiry_interval`** — how often the sweeper wakes up. Smaller = fresher
+  reclamation, more CPU wakeups.
+- **`expiry_budget_ms`** — a hard time cap per sweep, so a keyspace full of
+  expired keys can never freeze the thread for long; leftovers are picked up on
+  the next tick.
+
+#### How it works (and why it needs the lock)
+
+Each sweep calls `active_expire_cycle()`, which mirrors Redis's `serverCron`:
+it samples ~20 keys from the TTL index, deletes the expired ones, and — if more
+than 25% of the sample was expired — loops to clean more aggressively, always
+bounded by the time budget. Sampling (rather than scanning) keeps the cost
+proportional to the number of volatile keys, not the whole keyspace.
+
+Because the sweeper runs on a **separate daemon thread**, it mutates the
+keyspace concurrently with your calls — so enabling `active_expiry` automatically
+turns the internal lock on (even if you passed `thread_safe=False`). You still
+write no synchronization code; it's handled for you.
+
+> The server doesn't use this thread: it drives `active_expire_cycle()` from its
+> own event loop instead, staying single-threaded. The background sweeper exists
+> specifically for **library** users, who have no loop of their own.
 
 ---
 
