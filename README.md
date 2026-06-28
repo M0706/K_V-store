@@ -268,6 +268,48 @@ s.set("session:42", token, ex=3600)   # mortal key + background reclamation + ha
 
 ---
 
+## Performance
+
+Used as a **library** (in-process, no sockets), the store is fast — a `get` is a
+dict lookup plus a lock, on the order of **hundreds of nanoseconds**. Numbers
+below are from `scripts/benchmark.py` on an **Apple M4 Pro, Python 3.14**; re-run
+it to get figures for your own machine (it prints the host spec).
+
+| Metric | Result |
+|---|---|
+| `GET` throughput (single thread) | **~4.0M ops/sec** (~245 ns/op) |
+| `SET` throughput (single thread) | **~3.6M ops/sec** (~275 ns/op) |
+| `GET` latency | p50 **208 ns**, p90 250 ns, p99 375 ns |
+| Memory per key (no TTL) | **~142 bytes** |
+| Memory per key (with TTL) | ~196 bytes (the TTL index adds ~55) |
+
+So ~1M keys ≈ **140 MB**, and a single process serves **millions of ops/sec** —
+roughly an order of magnitude faster than a localhost round-trip to a real Redis
+server, precisely because there's no socket, no RESP encoding, and no kernel in
+the path.
+
+**Read these honestly:**
+
+- **Scale with processes, not threads.** Under CPython's GIL, CPU-bound dict work
+  serializes — 8 threads give roughly the *same* aggregate throughput as one
+  (measured: ~3M ops/sec either way), not an 8× speedup. The headline figure is
+  **per process**; run multiple processes to use more cores. (A future
+  free-threaded Python build would change this.)
+- **The lock is nearly free uncontended.** `thread_safe=True` and
+  `thread_safe=False` measure within noise single-threaded; the opt-out matters
+  under heavy contention, not in the common case.
+- **142 bytes/key is Python's object overhead, not ours.** Every Python string
+  and tuple carries ~50 bytes of header — inherent to a pure-Python store, and
+  the reason `max_size` bounds by **key count** rather than bytes.
+
+Reproduce with:
+
+```bash
+python scripts/benchmark.py
+```
+
+---
+
 ## Requirements
 
 - Python 3.10+ (uses `X | Y` union type hints)
