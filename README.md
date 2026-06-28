@@ -3,19 +3,56 @@
 A fast in-memory key-value store with TTL, active expiry, and eviction — usable
 **as a library** (`from vortis import Store`) or **as a server**. The server
 speaks the [RESP protocol](https://redis.io/docs/reference/protocol-spec/), so
-any standard Redis client — `redis-cli`, `redis-py`, `redis-benchmark` — can
-connect without modification.
+standard Redis clients — `redis-cli`, `redis-py`, `redis-benchmark` — connect
+without modification.
+
+It is small and pure-Python (zero runtime dependencies). It implements a focused
+subset of Redis — strings with TTL, not the full command set — and keeps data in
+memory only. See [What vortis is (and isn't)](#what-vortis-is-and-isnt) before
+reaching for it, so expectations are clear up front.
+
+> **Status:** a learning-grade, single-node store. Solid and well-tested for what
+> it does (see [Performance](#performance) and the test suite), but **not** a
+> drop-in Redis replacement — it has 5 commands and no persistence.
+
+---
+
+## What vortis is (and isn't)
+
+Being honest about scope so you can decide quickly whether it fits.
+
+**Good fit for:**
+
+- An **embeddable in-process KV store** with Redis-style TTL semantics, when you
+  want a dependency-free `pip install` rather than running a separate service.
+- **Tests / local dev** — a real TTL+eviction store with nothing to spin up.
+- A **single-pod / single-process** cache where running Redis would be overkill.
+- Learning how a Redis-like store works inside (the code is small and commented).
+
+**Not a fit for / current limitations:**
+
+- **Only 5 commands** — `PING`, `ECHO`, `SET`, `GET`, `DEL`. No lists, hashes,
+  sets, sorted sets, `INCR`, `EXPIRE`, `SCAN`, pub/sub, transactions, etc.
+- **No persistence** — data lives in RAM only; a restart loses everything. There
+  is no RDB/AOF equivalent.
+- **Single-node** — no replication, clustering, or sharding.
+- **One process at a time per port**, and throughput is **GIL-bound** (scale with
+  more processes, not threads — see [Performance](#performance)).
+- **Bounding is by key count, not bytes** (a byte-based limiter is planned).
+- **Not security-hardened** — no auth, no TLS; bind to `127.0.0.1` and don't
+  expose it to untrusted networks.
+
+If you need the full Redis feature set, persistence, or clustering, use real
+[Redis](https://redis.io) or [Valkey](https://valkey.io). vortis deliberately
+trades breadth for being tiny, readable, and dependency-free.
 
 ---
 
 ## Architecture Overview
 
 The code is layered so the same core can be used **two ways**: imported as an
-in-process library, or run as a network server. Each layer depends only on the
-one below it.
-
-The package lives under `src/vortis/`. Each layer depends only on the one below
-it.
+in-process library, or run as a network server. The package lives under
+`src/vortis/`, and each layer depends only on the one below it.
 
 ```
 Layer 3  vortis/async_tcp.py, sync_tcp.py  — TCP servers (RESP over sockets)
@@ -344,7 +381,8 @@ Or from Python:
 
 ```python
 from vortis import serve
-serve(port=6379)
+serve()                 # defaults to 127.0.0.1:65432
+serve(port=6379)        # or choose a port (e.g. Redis's default)
 ```
 
 The server listens on `127.0.0.1:65432` by default.
@@ -433,6 +471,11 @@ redis-benchmark -p 65432 -t set,get -n 10000
 ---
 
 ## Supported Commands
+
+This is the **complete** command set — five commands (plus the `CLIENT`/`CONFIG`/
+`COMMAND` handshake stubs that let `redis-cli` and `redis-benchmark` connect).
+Everything else a Redis client might send is answered with an `-ERR unknown
+command` error.
 
 | Command | Syntax | Description |
 |---|---|---|
@@ -580,3 +623,9 @@ And the sampling parameters in `src/vortis/store.py`:
 KEYS_PER_LOOP = 20       # keys sampled per cycle
 ACCEPTABLE_STALE = 0.25  # re-run if more than 25% of the sample was expired
 ```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
